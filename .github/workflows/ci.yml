@@ -48,4 +48,17 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
+        env:
+          APP_ENV: test
+          APP_NAME: llm-gateway-test
+          LOG_LEVEL: DEBUG
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/llm_gateway_test
+          REDIS_URL: redis://localhost:6379/0
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_BASE_URL: https://openrouter.ai/api/v1
+          OPENROUTER_MODEL: openai/gpt-3.5-turbo
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-pro
+          LLM_TIMEOUT_SECONDS: "30"
+          LLM_MAX_RETRIES: "3"
         run: pytest tests/ -v
