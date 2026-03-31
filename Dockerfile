@@ -31,6 +31,8 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
 COPY app ./app
 COPY alembic ./alembic        
 COPY alembic.ini ./alembic.ini
+COPY tests ./tests              
+COPY pytest.ini ./pytest.ini
 
 RUN chown -R appuser:appuser /app
 USER appuser
