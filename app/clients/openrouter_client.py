@@ -13,12 +13,17 @@ class OpenRouterClient(BaseLLMClient):
     def __init__(self) -> None:
         settings = get_settings()
         self._api_key = settings.openrouter_api_key
-        self._base_url = settings.openrouter_base_url
+        self._base_url = settings.openrouter_base_url.rstrip("/")
         self._model = settings.openrouter_model
         self._timeout = settings.llm_timeout_seconds
 
     async def complete(self, prompt: str, user_id: str) -> LLMResponse:
-        """Send prompt to OpenRouter and return standardized response."""
+        """Send prompt to OpenRouter and return standardized response.
+
+        Endpoint and headers follow https://openrouter.ai/docs/quickstart
+        (``POST /api/v1/chat/completions``, optional ``HTTP-Referer`` /
+        ``X-OpenRouter-Title`` for attribution).
+        """
         payload = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],
@@ -27,7 +32,8 @@ class OpenRouterClient(BaseLLMClient):
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
-            "X-Title": "llm-gateway-api",
+            "HTTP-Referer": "https://localhost",
+            "X-OpenRouter-Title": "llm-gateway-api",
         }
 
         start = time.monotonic()

@@ -1,14 +1,21 @@
 """Google Gemini LLM provider client."""
 import time
+import logging
 
 import httpx
 
 from app.clients.base_llm_client import BaseLLMClient, LLMResponse
 from app.config.settings import get_settings
 
+logger = logging.getLogger(__name__)
+
 
 class GeminiClient(BaseLLMClient):
-    """Async HTTP client for Google Gemini API."""
+    """Async HTTP client for Google Gemini API.
+
+    Uses the official REST API as documented in the quickstart:
+    POST .../models/{model}:generateContent with the x-goog-api-key header.
+    """
 
     _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -25,19 +32,30 @@ class GeminiClient(BaseLLMClient):
         payload = {
             "contents": [
                 {
-                    "parts": [{"text": prompt}]
-                }
-            ]
+                    "parts": [{"text": prompt}],
+                },
+            ],
         }
 
         start = time.monotonic()
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
+            logger.debug(
+                "Sending request to Gemini",
+                extra={
+                    "user_id": user_id,
+                    "model": self._model,
+                    "url": url,
+                    "payload": payload,
+                },
+            )
             response = await client.post(
                 url,
                 json=payload,
-                params={"key": self._api_key},
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self._api_key,
+                },
             )
             response.raise_for_status()
 
@@ -48,6 +66,16 @@ class GeminiClient(BaseLLMClient):
             data["candidates"][0]["content"]["parts"][0]["text"]
         )
         tokens_used = data.get("usageMetadata", {}).get("totalTokenCount")
+
+        logger.debug(
+            "Received response from Gemini",
+            extra={
+                "user_id": user_id,
+                "model": self._model,
+                "latency_ms": latency_ms,
+                "tokens_used": tokens_used,
+            },
+        )
 
         return LLMResponse(
             content=content,

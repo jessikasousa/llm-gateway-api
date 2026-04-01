@@ -13,20 +13,11 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class LLMResponse(BaseModel):
-    """Normalized response schema for LLM providers."""
-
-    content: str
-    model: str
-    tokens_used: int | None = None
-    latency_ms: int | None = None
-
-
 class ChatResponse(BaseModel):
     """Outgoing response schema for chat interactions."""
 
     id: UUID
-    user_id: str = Field(..., alias="userId")
+    user_id: str = Field(..., serialization_alias="userId")
     prompt: str
     response: str
     model: str
