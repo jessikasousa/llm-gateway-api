@@ -9,6 +9,11 @@ class ChatRequest(BaseModel):
 
     user_id: str = Field(..., alias="userId", min_length=1)
     prompt: str = Field(..., min_length=1, max_length=4000)
+    use_web_search: bool = Field(
+        default=False,
+        alias="useWebSearch",
+        description="When true, route to Gemini with Google Search grounding.",
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 

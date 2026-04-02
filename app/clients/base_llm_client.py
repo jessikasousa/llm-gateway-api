@@ -16,6 +16,16 @@ class BaseLLMClient(ABC):
     """Contract for asynchronous LLM provider clients."""
 
     @abstractmethod
-    async def complete(self, prompt: str, user_id: str) -> "LLMResponse":
-        """Generate a completion for a user prompt."""
+    async def complete(
+        self,
+        prompt: str,
+        user_id: str,
+        *,
+        grounding_enabled: bool = False,
+    ) -> "LLMResponse":
+        """Generate a completion for a user prompt.
+
+        ``grounding_enabled`` is honored by providers that support web grounding
+        (e.g. Gemini); others may ignore it.
+        """
         raise NotImplementedError

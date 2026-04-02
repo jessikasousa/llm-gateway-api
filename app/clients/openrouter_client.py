@@ -17,13 +17,23 @@ class OpenRouterClient(BaseLLMClient):
         self._model = settings.openrouter_model
         self._timeout = settings.llm_timeout_seconds
 
-    async def complete(self, prompt: str, user_id: str) -> LLMResponse:
+    async def complete(
+        self,
+        prompt: str,
+        user_id: str,
+        *,
+        grounding_enabled: bool = False,
+    ) -> LLMResponse:
         """Send prompt to OpenRouter and return standardized response.
+
+        ``grounding_enabled`` is accepted for interface parity with other clients
+        and is ignored (OpenRouter web search is not enabled here).
 
         Endpoint and headers follow https://openrouter.ai/docs/quickstart
         (``POST /api/v1/chat/completions``, optional ``HTTP-Referer`` /
         ``X-OpenRouter-Title`` for attribution).
         """
+        _ = grounding_enabled
         payload = {
             "model": self._model,
             "messages": [{"role": "user", "content": prompt}],

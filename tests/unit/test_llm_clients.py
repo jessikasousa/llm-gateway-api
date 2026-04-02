@@ -77,3 +77,31 @@ async def test_gemini_returns_llm_response():
     assert result.content == "Hello from Gemini!"
     assert result.tokens_used == 10
     assert result.latency_ms is not None
+
+
+@pytest.mark.asyncio
+async def test_gemini_request_includes_google_search_tool_when_grounding_enabled():
+    """When grounding_enabled, JSON body includes tools with google_search per REST API."""
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "candidates": [
+            {"content": {"parts": [{"text": "grounded answer"}]}}
+        ],
+        "usageMetadata": {"totalTokenCount": 5},
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    post_mock = AsyncMock(return_value=mock_response)
+
+    with patch("app.clients.gemini_client.httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__.return_value.post = post_mock
+        client = GeminiClient()
+        await client.complete(
+            "Test prompt",
+            user_id="user-1",
+            grounding_enabled=True,
+        )
+
+    assert post_mock.await_count == 1
+    call_kwargs = post_mock.call_args.kwargs
+    assert call_kwargs["json"]["tools"] == [{"google_search": {}}]

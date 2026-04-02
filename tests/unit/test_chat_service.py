@@ -43,7 +43,11 @@ async def test_process_chat_saves_interaction_after_llm_success() -> None:
     result = await service.process_chat(payload)
 
     assert result is stored
-    llm_service.generate.assert_awaited_once_with("hello", "user-abc")
+    llm_service.generate.assert_awaited_once_with(
+        "hello",
+        "user-abc",
+        use_web_search=False,
+    )
     repository.save_interaction.assert_awaited_once_with(
         user_id="user-abc",
         prompt="hello",

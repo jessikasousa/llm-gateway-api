@@ -10,11 +10,20 @@ from app.config.settings import get_settings
 logger = logging.getLogger(__name__)
 
 
+def _extract_candidate_text(data: dict) -> str:
+    """Concatenate text parts from the first candidate (grounding may use multiple parts)."""
+    parts = data["candidates"][0]["content"].get("parts") or []
+    return "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+
+
 class GeminiClient(BaseLLMClient):
     """Async HTTP client for Google Gemini API.
 
     Uses the official REST API as documented in the quickstart:
     POST .../models/{model}:generateContent with the x-goog-api-key header.
+
+    Grounding uses the ``google_search`` tool per REST docs (Gemini 2+). Older
+    models may require ``google_search_retrieval`` instead; see Google AI docs.
     """
 
     _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -25,17 +34,29 @@ class GeminiClient(BaseLLMClient):
         self._model = settings.gemini_model
         self._timeout = settings.llm_timeout_seconds
 
-    async def complete(self, prompt: str, user_id: str) -> LLMResponse:
-        """Send prompt to Gemini and return standardized response."""
+    async def complete(
+        self,
+        prompt: str,
+        user_id: str,
+        *,
+        grounding_enabled: bool = False,
+    ) -> LLMResponse:
+        """Send prompt to Gemini and return standardized response.
+
+        When ``grounding_enabled`` is True, enables Grounding with Google Search
+        via the ``google_search`` tool in the request body.
+        """
         url = f"{self._BASE_URL}/{self._model}:generateContent"
 
-        payload = {
+        payload: dict = {
             "contents": [
                 {
                     "parts": [{"text": prompt}],
                 },
             ],
         }
+        if grounding_enabled:
+            payload["tools"] = [{"google_search": {}}]
 
         start = time.monotonic()
 
@@ -46,6 +67,7 @@ class GeminiClient(BaseLLMClient):
                     "user_id": user_id,
                     "model": self._model,
                     "url": url,
+                    "grounding_enabled": grounding_enabled,
                     "payload": payload,
                 },
             )
@@ -62,9 +84,7 @@ class GeminiClient(BaseLLMClient):
         latency_ms = int((time.monotonic() - start) * 1000)
         data = response.json()
 
-        content = (
-            data["candidates"][0]["content"]["parts"][0]["text"]
-        )
+        content = _extract_candidate_text(data)
         tokens_used = data.get("usageMetadata", {}).get("totalTokenCount")
 
         logger.debug(
@@ -74,6 +94,7 @@ class GeminiClient(BaseLLMClient):
                 "model": self._model,
                 "latency_ms": latency_ms,
                 "tokens_used": tokens_used,
+                "grounding_enabled": grounding_enabled,
             },
         )
 
