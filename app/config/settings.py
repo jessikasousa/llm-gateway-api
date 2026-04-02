@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,11 @@ class Settings(BaseSettings):
 
     llm_timeout_seconds: int
     llm_max_retries: int
+
+    cors_allow_origins: list[str] = Field(default_factory=lambda: ["*"])
+    cors_allow_methods: list[str] = Field(default_factory=lambda: ["*"])
+    cors_allow_headers: list[str] = Field(default_factory=lambda: ["*"])
+    cors_allow_credentials: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
