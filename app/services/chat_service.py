@@ -15,7 +15,6 @@ class ChatService:
         llm_result = await self._llm_service.generate(
             payload.prompt,
             payload.user_id,
-            use_web_search=payload.use_web_search,
         )
         return await self._repository.save_interaction(
             user_id=payload.user_id,

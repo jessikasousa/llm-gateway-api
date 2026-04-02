@@ -20,6 +20,7 @@ htmlcov/
 .nox/
 
 # Virtual environments
+venv_new/
 .venv/
 venv/
 env/

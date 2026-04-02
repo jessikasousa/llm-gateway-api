@@ -1,17 +1,44 @@
+# FastAPI and Uvicorn
 fastapi==0.115.12
 uvicorn[standard]==0.34.0
+
+# Pydantic for data validation and settings
 pydantic==2.11.1
 pydantic-settings==2.8.1
-sqlalchemy==2.0.39
+
+# Database
+SQLAlchemy==2.0.39
 asyncpg==0.30.0
 alembic==1.15.1
+psycopg2-binary==2.9.9 # For Alembic/SQLAlchemy to connect to Postgres
+
+# HTTP Client
 httpx==0.28.1
+
+# Resiliency
 tenacity==9.0.0
+
+# Redis
 redis==5.2.1
+
+# ULID generation
 python-ulid==2.7.0
+
+# Observability
 structlog==25.2.0
+prometheus_client==0.21.1
+starlette_exporter==0.19.0
+
+# Type Hinting
+typing-extensions==4.15.0
+
+# Testing (Development Dependencies)
 pytest==8.3.5
 pytest-asyncio==0.25.3
 pytest-mock==3.14.0
+
+# Code Quality (Development Dependency)
 ruff==0.11.0
+
+# Datadog APM (If activate it later)
 ddtrace==2.18.2

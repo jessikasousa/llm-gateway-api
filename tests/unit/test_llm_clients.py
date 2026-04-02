@@ -1,4 +1,5 @@
 """LLM client unit tests with mocked HTTP calls."""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,6 +9,7 @@ from app.clients.base_llm_client import LLMResponse
 
 
 # ── OpenRouter ──────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_openrouter_returns_llm_response():
@@ -54,14 +56,13 @@ async def test_openrouter_raises_on_http_error():
 
 # ── Gemini ───────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_gemini_returns_llm_response():
     """GeminiClient.complete should return a valid LLMResponse."""
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "candidates": [
-            {"content": {"parts": [{"text": "Hello from Gemini!"}]}}
-        ],
+        "candidates": [{"content": {"parts": [{"text": "Hello from Gemini!"}]}}],
         "usageMetadata": {"totalTokenCount": 10},
     }
     mock_response.raise_for_status = MagicMock()
@@ -84,9 +85,7 @@ async def test_gemini_request_includes_google_search_tool_when_grounding_enabled
     """When grounding_enabled, JSON body includes tools with google_search per REST API."""
     mock_response = MagicMock()
     mock_response.json.return_value = {
-        "candidates": [
-            {"content": {"parts": [{"text": "grounded answer"}]}}
-        ],
+        "candidates": [{"content": {"parts": [{"text": "grounded answer"}]}}],
         "usageMetadata": {"totalTokenCount": 5},
     }
     mock_response.raise_for_status = MagicMock()
@@ -104,4 +103,4 @@ async def test_gemini_request_includes_google_search_tool_when_grounding_enabled
 
     assert post_mock.await_count == 1
     call_kwargs = post_mock.call_args.kwargs
-    assert call_kwargs["json"]["tools"] == [{"google_search": {}}]
+    assert call_kwargs["json"]["tools"] == [{"googleSearch": {}}]

@@ -10,10 +10,17 @@ class LLMResponse:
     model: str
     tokens_used: int | None
     latency_ms: int | None
+    response_id: str | None = None  # Adicionado para paridade com o log do service
 
 
 class BaseLLMClient(ABC):
     """Contract for asynchronous LLM provider clients."""
+
+    @property
+    @abstractmethod
+    def provider_name(self) -> str:
+        """Return the unique identifier for the provider (e.g., 'gemini', 'openrouter')."""
+        pass
 
     @abstractmethod
     async def complete(
@@ -23,9 +30,5 @@ class BaseLLMClient(ABC):
         *,
         grounding_enabled: bool = False,
     ) -> "LLMResponse":
-        """Generate a completion for a user prompt.
-
-        ``grounding_enabled`` is honored by providers that support web grounding
-        (e.g. Gemini); others may ignore it.
-        """
-        raise NotImplementedError
+        """Generate a completion for a user prompt."""
+        pass

@@ -1,30 +1,40 @@
 """Google Gemini LLM provider client."""
-import time
-import logging
 
+import time
+import structlog
 import httpx
+from typing import Any, Dict, List, Optional
 
 from app.clients.base_llm_client import BaseLLMClient, LLMResponse
 from app.config.settings import get_settings
+from app.schemas.chat import (
+    Message,
+)  # Importar Message para _convert_messages_to_gemini_format
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _extract_candidate_text(data: dict) -> str:
-    """Concatenate text parts from the first candidate (grounding may use multiple parts)."""
-    parts = data["candidates"][0]["content"].get("parts") or []
-    return "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+    """Concatenate text parts from the first candidate."""
+    try:
+        parts = data["candidates"][0]["content"].get("parts") or []
+        return "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+    except (KeyError, IndexError):
+        return ""
+
+
+def _convert_messages_to_gemini_format(messages: List[Message]) -> List[Dict[str, Any]]:
+    """Converts internal Message format to Gemini API format."""
+    gemini_messages = []
+    for msg in messages:
+        # Gemini expects 'user' and 'model' roles. 'assistant' maps to 'model'.
+        role = "user" if msg.role == "user" else "model"
+        gemini_messages.append({"role": role, "parts": [{"text": msg.content}]})
+    return gemini_messages
 
 
 class GeminiClient(BaseLLMClient):
-    """Async HTTP client for Google Gemini API.
-
-    Uses the official REST API as documented in the quickstart:
-    POST .../models/{model}:generateContent with the x-goog-api-key header.
-
-    Grounding uses the ``google_search`` tool per REST docs (Gemini 2+). Older
-    models may require ``google_search_retrieval`` instead; see Google AI docs.
-    """
+    """Async HTTP client for Google Gemini API."""
 
     _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -33,6 +43,11 @@ class GeminiClient(BaseLLMClient):
         self._api_key = settings.gemini_api_key
         self._model = settings.gemini_model
         self._timeout = settings.llm_timeout_seconds
+        self._name = "gemini"  # Definido aqui
+
+    @property
+    def provider_name(self) -> str:
+        return self._name
 
     async def complete(
         self,
@@ -41,36 +56,32 @@ class GeminiClient(BaseLLMClient):
         *,
         grounding_enabled: bool = False,
     ) -> LLMResponse:
-        """Send prompt to Gemini and return standardized response.
-
-        When ``grounding_enabled`` is True, enables Grounding with Google Search
-        via the ``google_search`` tool in the request body.
-        """
+        """Send prompt to Gemini with optional Google Search grounding."""
         url = f"{self._BASE_URL}/{self._model}:generateContent"
 
+        # Convertendo o prompt para o formato de mensagens do Gemini
+        messages_for_gemini = _convert_messages_to_gemini_format(
+            [Message(role="user", content=prompt)]
+        )
+
         payload: dict = {
-            "contents": [
-                {
-                    "parts": [{"text": prompt}],
-                },
-            ],
+            "contents": messages_for_gemini,
+            "generationConfig": {  # Adicionado para controle de temperatura/tokens
+                "temperature": 0.7,  # Valor padrão, pode ser configurável
+                "maxOutputTokens": 1024,  # Valor padrão, pode ser configurável
+            },
         }
+
         if grounding_enabled:
-            payload["tools"] = [{"google_search": {}}]
+            # Formato correto para Google Search grounding com Gemini API
+            payload["tools"] = [{"googleSearch": {}}]
+            logger.info(
+                "gemini_grounding_enabled", user_id=user_id
+            )  # Log para rastreamento
 
         start = time.monotonic()
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            logger.debug(
-                "Sending request to Gemini",
-                extra={
-                    "user_id": user_id,
-                    "model": self._model,
-                    "url": url,
-                    "grounding_enabled": grounding_enabled,
-                    "payload": payload,
-                },
-            )
             response = await client.post(
                 url,
                 json=payload,
@@ -87,15 +98,10 @@ class GeminiClient(BaseLLMClient):
         content = _extract_candidate_text(data)
         tokens_used = data.get("usageMetadata", {}).get("totalTokenCount")
 
-        logger.debug(
-            "Received response from Gemini",
-            extra={
-                "user_id": user_id,
-                "model": self._model,
-                "latency_ms": latency_ms,
-                "tokens_used": tokens_used,
-                "grounding_enabled": grounding_enabled,
-            },
+        # Gemini não retorna um 'id' direto para a resposta, então geramos um ou usamos um placeholder
+        response_id = (
+            data.get("candidates", [{}])[0].get("index")
+            or f"gemini-resp-{int(time.time())}"
         )
 
         return LLMResponse(
@@ -103,4 +109,5 @@ class GeminiClient(BaseLLMClient):
             model=self._model,
             tokens_used=tokens_used,
             latency_ms=latency_ms,
+            response_id=response_id,
         )

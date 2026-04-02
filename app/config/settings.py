@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     gemini_api_key: str
     gemini_model: str
 
+    llm_primary_model: str = "google/gemma-3-4b-it:free"
+
     llm_timeout_seconds: int
     llm_max_retries: int
 
@@ -27,6 +29,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
 

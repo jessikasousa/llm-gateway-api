@@ -1,4 +1,5 @@
 """Unit tests for ChatService orchestration."""
+
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -46,7 +47,6 @@ async def test_process_chat_saves_interaction_after_llm_success() -> None:
     llm_service.generate.assert_awaited_once_with(
         "hello",
         "user-abc",
-        use_web_search=False,
     )
     repository.save_interaction.assert_awaited_once_with(
         user_id="user-abc",

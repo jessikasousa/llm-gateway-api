@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clients.gemini_client import GeminiClient
 from app.clients.openrouter_client import OpenRouterClient
+from app.config.settings import get_settings
 from app.core.database import get_db_session
 from app.core.observability import get_logger
 from app.repositories.chat_repository import ChatRepository
@@ -18,7 +19,10 @@ logger = get_logger(__name__)
 
 def get_llm_service() -> LLMService:
     """Wire primary (OpenRouter) and fallback (Gemini) clients."""
-    return LLMService(OpenRouterClient(), GeminiClient())
+    settings = get_settings()
+    primary_client = OpenRouterClient(api_key=settings.openrouter_api_key)
+    fallback_client = GeminiClient()
+    return LLMService(primary_client, fallback_client)
 
 
 def get_chat_repository(

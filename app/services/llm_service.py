@@ -1,5 +1,7 @@
 """LLM routing: hybrid web-grounding path, primary OpenRouter with retries, Gemini fallback."""
+
 import logging
+import time
 import unicodedata
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -7,6 +9,12 @@ from tenacity.before_sleep import before_sleep_log
 
 from app.clients.base_llm_client import BaseLLMClient, LLMResponse
 from app.config.settings import get_settings
+from app.metrics.metrics import (
+    llm_calls_total,
+    llm_request_duration_seconds,
+    llm_grounding_total,
+    llm_fallback_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +45,9 @@ def _normalize_prompt_for_keywords(prompt: str) -> str:
 class LLMService:
     """Route generation: Gemini+grounding when web data is needed; else OpenRouter with retries."""
 
-    def __init__(self, primary_client: BaseLLMClient, fallback_client: BaseLLMClient) -> None:
+    def __init__(
+        self, primary_client: BaseLLMClient, fallback_client: BaseLLMClient
+    ) -> None:
         self._primary_client: BaseLLMClient = primary_client
         self._fallback_client: BaseLLMClient = fallback_client
 
@@ -54,27 +64,59 @@ class LLMService:
         *,
         use_web_search: bool = False,
     ) -> LLMResponse:
-        """Complete the prompt using hybrid routing and resilient fallback.
+        """Complete the prompt using hybrid routing and resilient fallback."""
 
-        When ``use_web_search`` is true or the prompt matches web-intent keywords,
-        calls the fallback client (Gemini) with Google Search grounding immediately.
+        # 1. Decision Logic: Should we go straight to Gemini with Grounding?
+        should_enable_grounding = use_web_search or self._requires_web_search(prompt)
 
-        Otherwise, calls the primary client (OpenRouter) with exponential backoff
-        retries. If all attempts fail, falls back to Gemini with grounding enabled.
-        """
-        should_use_grounding = use_web_search or self._requires_web_search(prompt)
-
-        if should_use_grounding:
+        if should_enable_grounding:
             logger.info(
                 "Routing to Gemini with Google Search grounding",
-                extra={"user_id": user_id, "use_web_search": use_web_search},
+                extra={
+                    "user_id": user_id,
+                    "should_enable_grounding": should_enable_grounding,
+                },
             )
-            return await self._fallback_client.complete(
-                prompt,
-                user_id,
-                grounding_enabled=True,
-            )
+            start_time = time.perf_counter()
+            try:
+                # O fallback_client aqui é o Gemini
+                response = await self._fallback_client.complete(
+                    prompt,
+                    user_id,
+                    grounding_enabled=True,
+                )
+                latency_ms = (time.perf_counter() - start_time) * 1000
 
+                # Métricas e Logs usando os novos atributos dos clientes
+                llm_calls_total.labels(
+                    provider=self._fallback_client.provider_name,
+                    model=response.model,
+                    outcome="success",
+                ).inc()
+
+                llm_grounding_total.labels(reason="routing").inc()
+
+                logger.info(
+                    "llm_request_completed",
+                    extra={
+                        "user_id": user_id,
+                        "model": response.model,
+                        "provider": self._fallback_client.provider_name,
+                        "latency_ms": latency_ms,
+                        "grounding_used": True,
+                        "response_id": response.response_id,
+                    },
+                )
+                return response
+            except Exception as exc:
+                logger.error(
+                    "llm_request_failed_during_grounding_route",
+                    extra={"user_id": user_id, "error": str(exc)},
+                    exc_info=True,
+                )
+                raise
+
+        # 2. Normal Path: Primary LLM (OpenRouter) with Retries
         settings = get_settings()
 
         @retry(
@@ -84,22 +126,71 @@ class LLMService:
             reraise=True,
         )
         async def call_primary_llm() -> LLMResponse:
-            return await self._primary_client.complete(
+            start_time = time.perf_counter()
+            response = await self._primary_client.complete(
                 prompt,
                 user_id,
                 grounding_enabled=False,
             )
+            latency_ms = (time.perf_counter() - start_time) * 1000
+
+            llm_calls_total.labels(
+                provider=self._primary_client.provider_name,
+                model=response.model,
+                outcome="success",
+            ).inc()
+
+            logger.info(
+                "llm_request_completed",
+                extra={
+                    "user_id": user_id,
+                    "model": response.model,
+                    "provider": self._primary_client.provider_name,
+                    "latency_ms": latency_ms,
+                    "grounding_used": False,
+                    "response_id": response.response_id,
+                },
+            )
+            return response
 
         try:
             return await call_primary_llm()
         except Exception as exc:
+            # 3. Fallback Path: If OpenRouter fails after all retries, try Gemini
             logger.warning(
                 "Primary LLM provider failed; attempting fallback with grounding",
                 extra={"user_id": user_id, "error": str(exc)},
-                exc_info=True,
             )
-            return await self._fallback_client.complete(
-                prompt,
-                user_id,
-                grounding_enabled=True,
-            )
+
+            llm_fallback_total.labels(
+                primary_provider=self._primary_client.provider_name,
+                fallback_provider=self._fallback_client.provider_name,
+            ).inc()
+
+            start_time = time.perf_counter()
+            try:
+                response = await self._fallback_client.complete(
+                    prompt,
+                    user_id,
+                    grounding_enabled=True,
+                )
+
+                logger.info(
+                    "llm_request_completed_after_fallback",
+                    extra={
+                        "user_id": user_id,
+                        "model": response.model,
+                        "provider": self._fallback_client.provider_name,
+                        "grounding_used": True,
+                        "response_id": response.response_id,
+                        "fallback": True,
+                    },
+                )
+                return response
+            except Exception as fallback_exc:
+                logger.error(
+                    "Critical failure: both primary and fallback LLMs failed",
+                    extra={"user_id": user_id, "error": str(fallback_exc)},
+                    exc_info=True,
+                )
+                raise
