@@ -89,6 +89,82 @@ docker compose up -d --build
 
 Credenciais padrao do Grafana (via `.env.example`): `admin / admin123`.
 
+## Teste Manual Rapido (curl e Postman)
+
+### Via curl
+
+1. Health check:
+
+```bash
+curl -X GET http://localhost:8000/health
+```
+
+2. Metrics (confirma exportacao para Prometheus):
+
+```bash
+curl -X GET http://localhost:8000/metrics
+```
+
+3. Chat (fluxo padrao):
+
+```bash
+curl -X POST http://localhost:8000/v1/chat \
+   -H "Content-Type: application/json" \
+   -d '{
+      "userId": "u1",
+      "prompt": "Explique rapidamente o que e IA generativa."
+   }'
+```
+
+Response esperado (exemplo):
+
+```json
+{
+  "id": "7859728e-e3d3-49ca-a71f-b73265fc0a03",
+  "userId": "u1",
+  "prompt": "Explique rapidamente o que e IA generativa.",
+  "response": "...texto gerado pelo modelo...",
+  "model": "google/gemma-3-4b-it:free",
+  "timestamp": "2026-04-02T21:09:53.122069Z"
+}
+```
+
+Obs.: os campos `id`, `response`, `model` e `timestamp` variam a cada chamada.
+
+4. Chat com chance maior de grounding (termos de busca web):
+
+```bash
+curl -X POST http://localhost:8000/v1/chat \
+   -H "Content-Type: application/json" \
+   -d '{
+      "userId": "u1",
+      "prompt": "Quais as noticias recentes sobre IA no Brasil hoje?"
+   }'
+```
+
+Response esperado (exemplo com grounding):
+
+```json
+{
+  "id": "3b8d9cb0-0c6f-4e8f-8ca8-5b10f4fda4a2",
+  "userId": "u1",
+  "prompt": "Quais as noticias recentes sobre IA no Brasil hoje?",
+  "response": "Aqui estao os principais destaques recentes sobre IA no Brasil...",
+  "model": "google/gemini-1.5-flash",
+  "timestamp": "2026-04-02T21:25:10.102345Z"
+}
+```
+
+Obs.: o contrato de resposta e o mesmo do fluxo padrao; no grounding, normalmente o conteudo vem mais orientado a informacoes recentes e o `model` tende a indicar a rota Gemini.
+
+### Via Postman
+
+1. Crie uma request `POST` para `http://localhost:8000/v1/chat`.
+2. Em `Headers`, adicione `Content-Type: application/json`.
+3. Em `Body -> raw -> JSON`, envie payload com `userId` e `prompt` (conforme exemplos de curl).
+4. Execute `GET http://localhost:8000/health` para validar disponibilidade da API.
+5. Opcional: importe a especificacao OpenAPI por `http://localhost:8000/openapi.json` para gerar a colecao automaticamente.
+
 ## Evidencias de Observabilidade (Grafana/Prometheus)
 
 Para demonstrar o desafio de observabilidade de forma objetiva:
