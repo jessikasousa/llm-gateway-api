@@ -11,7 +11,6 @@ from app.clients.base_llm_client import BaseLLMClient, LLMResponse
 from app.config.settings import get_settings
 from app.metrics.metrics import (
     llm_calls_total,
-    llm_request_duration_seconds,
     llm_grounding_total,
     llm_fallback_total,
 )

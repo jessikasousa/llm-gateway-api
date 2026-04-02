@@ -1,8 +1,7 @@
 import httpx
-import json
 import structlog
 import time  # Importar time
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import List
 
 from app.clients.base_llm_client import (
     BaseLLMClient,
@@ -10,9 +9,8 @@ from app.clients.base_llm_client import (
 )  # Importar BaseLLMClient e LLMResponse
 from app.schemas.chat import (
     ChatCompletionRequest,
-    ChatCompletionResponse,
     Message,
-)  # Importar ChatCompletionRequest, ChatCompletionResponse, Message
+)  # Importar ChatCompletionRequest e Message
 from app.config.settings import get_settings
 
 logger = structlog.get_logger(__name__)

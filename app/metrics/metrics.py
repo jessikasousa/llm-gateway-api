@@ -1,6 +1,6 @@
 """Prometheus metrics for LLM Gateway API."""
 
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Histogram
 
 # HTTP metrics
 http_requests_total = Counter(

@@ -3,7 +3,7 @@
 import time
 import structlog
 import httpx
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from app.clients.base_llm_client import BaseLLMClient, LLMResponse
 from app.config.settings import get_settings
