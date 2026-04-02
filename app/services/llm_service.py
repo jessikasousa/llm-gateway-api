@@ -89,7 +89,7 @@ class LLMService:
 
                 # Métricas e Logs usando os novos atributos dos clientes
                 llm_calls_total.labels(
-                    provider=self._fallback_client.provider_name,
+                    provider=self._fallback_client.provider_name.lower(),
                     model=response.model,
                     outcome="success",
                 ).inc()
@@ -135,7 +135,7 @@ class LLMService:
             latency_ms = (time.perf_counter() - start_time) * 1000
 
             llm_calls_total.labels(
-                provider=self._primary_client.provider_name,
+                provider=self._primary_client.provider_name.lower(),
                 model=response.model,
                 outcome="success",
             ).inc()
@@ -163,8 +163,8 @@ class LLMService:
             )
 
             llm_fallback_total.labels(
-                primary_provider=self._primary_client.provider_name,
-                fallback_provider=self._fallback_client.provider_name,
+                primary_provider=self._primary_client.provider_name.lower(),
+                fallback_provider=self._fallback_client.provider_name.lower(),
             ).inc()
 
             start_time = time.perf_counter()
