@@ -87,7 +87,7 @@ docker compose up -d --build
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
 
-Credenciais padrao do Grafana (via `.env.example`): `admin / admin123`.
+Credenciais padrao do Grafana (via `.env.example`): `your_admin_user / your_admin_password`.
 
 ## Teste Manual Rapido (curl e Postman)
 
